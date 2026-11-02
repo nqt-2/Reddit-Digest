@@ -1,0 +1,29 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables & secrets
+.env
+
+# Python cache & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+
+# Local SQLite database & temporary data
+*.db
+*.sqlite
+*.sqlite3
+data/
+digests/
+
+# Logs
+*.log
+logs/
+
+# IDE settings
+.vscode/
+.idea/

@@ -1,0 +1,33 @@
+subreddits:
+  - Embedded
+  - robotics
+  - cpp
+  - Python
+  - LocalLLaMA
+
+collection:
+  limit_per_subreddit: 15
+  min_selftext_chars: 80
+  min_comments_for_link_post: 3
+
+comments:
+  max_top_level: 8
+  max_replies_per_comment: 2
+  min_comment_length: 20
+  max_total_chars: 6000
+
+llm:
+  model_name: "gemini-2.5-flash"
+  min_relevance_score: 3
+
+reader_profile: >
+  Sinh viên Kỹ thuật máy tính. Quan tâm đến Python, C++, Embedded Systems,
+  Robotics và Physical AI. Muốn rút ra kiến thức kỹ thuật thực tế, kinh nghiệm
+  thiết kế hệ thống và bài học có thể áp dụng vào việc học hoặc dự án cá nhân.
+
+schedule:
+  interval_hours: 12
+
+storage:
+  db_path: "data/digest.db"
+  digest_dir: "digests"
