@@ -1,12 +1,10 @@
 subreddits:
-  - Embedded
   - robotics
-  - cpp
-  - Python
-  - LocalLLaMA
+  - AskRobotics
+  - ComputerEngineering
 
 collection:
-  limit_per_subreddit: 15
+  limit_per_subreddit: 2
   min_selftext_chars: 80
   min_comments_for_link_post: 3
 
