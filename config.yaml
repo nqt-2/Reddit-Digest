@@ -4,7 +4,7 @@ subreddits:
   - ComputerEngineering
 
 collection:
-  limit_per_subreddit: 2
+  limit_per_subreddit: 5
   min_selftext_chars: 80
   min_comments_for_link_post: 3
 
