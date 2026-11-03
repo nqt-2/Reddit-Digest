@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Literal
 import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
@@ -9,9 +10,12 @@ DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) reddit-ai-digest
 
 
 class CollectionConfig(BaseModel):
-    limit_per_subreddit: int = Field(gt=0, le=100)
-    min_selftext_chars: int = Field(ge=0)
-    min_comments_for_link_post: int = Field(ge=0)
+    limit_per_subreddit: int = Field(default=5, gt=0, le=100)
+    fetch_pool_size: int = Field(default=20, gt=0, le=100)
+    time_filter: Literal["hour", "day", "week", "month", "year", "all"] = "week"
+    max_age_days: int = Field(default=7, gt=0)
+    min_selftext_chars: int = Field(default=80, ge=0)
+    min_comments: int = Field(default=2, ge=0)
 
 
 class CommentsConfig(BaseModel):

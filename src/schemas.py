@@ -19,6 +19,7 @@ class Post(BaseModel):
     permalink: str
     created_utc: float
     score: int
+    hot_score: float = 0.0
     num_comments: int
     is_self: bool
     stickied: bool = False

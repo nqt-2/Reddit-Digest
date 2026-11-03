@@ -25,25 +25,29 @@ def run_pipeline() -> None:
 
     try:
         for sub in cfg.subreddits:
-            log.info("Fetching r/%s...", sub)
+            log.info("Fetching r/%s (top & comments in %s)...", sub, cfg.collection.time_filter)
             try:
-                raw_posts = reddit.fetch_new_posts(sub, cfg.collection.limit_per_subreddit)
+                raw_posts = reddit.fetch_hot_posts(sub, cfg.collection)
             except Exception as exc:
                 log.error("Failed fetching r/%s: %s", sub, exc)
                 continue
 
             candidates = filter_posts(raw_posts, cfg.collection, storage)
-            log.info("r/%s: %d fetched, %d candidates after filtering", sub, len(raw_posts), len(candidates))
+            log.info("r/%s: %d unique hot posts in pool, %d candidates after filtering", sub, len(raw_posts), len(candidates))
 
+            processed_in_sub = 0
             for post in candidates:
+                if processed_in_sub >= cfg.collection.limit_per_subreddit:
+                    break
                 try:
-                    storage.save_post(post, status="COLLECTED")
                     comments = fetch_and_select_comments(reddit, post.id, cfg.comments)
                     post.num_comments = len(comments)
-                    if not post.is_self and len(comments) < cfg.collection.min_comments_for_link_post:
-                        log.info("Skipping link post %s (only %d comments)", post.id, len(comments))
-                        storage.mark_status(post.id, "SKIPPED")
+                    if len(comments) < cfg.collection.min_comments:
+                        log.info("Skipping post %s (only %d/%d qualifying comments)", post.id, len(comments), cfg.collection.min_comments)
                         continue
+
+                    processed_in_sub += 1
+                    storage.save_post(post, status="COLLECTED")
                     summary = summarizer.summarize(post, comments)
 
                     if summary.relevance_score < cfg.llm.min_relevance_score:
