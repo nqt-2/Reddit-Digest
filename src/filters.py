@@ -28,4 +28,4 @@ def filter_posts(
         accepted.append(p)
 
     accepted.sort(key=lambda p: (p.hot_score, p.created_utc), reverse=True)
-    return accepted
+    return accepted[: cfg.limit_per_subreddit]

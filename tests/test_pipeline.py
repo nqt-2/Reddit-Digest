@@ -78,7 +78,7 @@ def test_filter_and_sqlite_dedup(tmp_path: Path):
 
 def test_hot_priority_before_recency(tmp_path: Path):
     storage = Storage(tmp_path / "test.db")
-    cfg = CollectionConfig(limit_per_subreddit=5, max_age_days=7, min_selftext_chars=80, min_comments=2)
+    cfg = CollectionConfig(limit_per_subreddit=3, max_age_days=7, min_selftext_chars=80, min_comments=2)
 
     # Newer post with lower hot_score vs Older post (within 7 days) with higher hot_score
     newer_less_hot = make_post(id="newer_low", created_utc=NOW_TS - 1800, hot_score=40.0)
@@ -92,7 +92,7 @@ def test_hot_priority_before_recency(tmp_path: Path):
         storage,
         now_ts=NOW_TS,
     )
-    assert [p.id for p in res] == ["older_hot", "tie_newer", "tie_older", "newer_low"]
+    assert [p.id for p in res] == ["older_hot", "tie_newer", "tie_older"]
     storage.close()
 
 

@@ -11,7 +11,7 @@ DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) reddit-ai-digest
 
 class CollectionConfig(BaseModel):
     limit_per_subreddit: int = Field(default=5, gt=0, le=100)
-    fetch_pool_size: int = Field(default=20, gt=0, le=100)
+    fetch_pool_size: int = Field(default=10, gt=0, le=100)
     time_filter: Literal["hour", "day", "week", "month", "year", "all"] = "week"
     max_age_days: int = Field(default=7, gt=0)
     min_selftext_chars: int = Field(default=80, ge=0)

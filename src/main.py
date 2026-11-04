@@ -33,21 +33,18 @@ def run_pipeline() -> None:
                 continue
 
             candidates = filter_posts(raw_posts, cfg.collection, storage)
-            log.info("r/%s: %d unique hot posts in pool, %d candidates after filtering", sub, len(raw_posts), len(candidates))
+            log.info("r/%s: %d unique hot posts in pool, %d top candidates selected", sub, len(raw_posts), len(candidates))
 
-            processed_in_sub = 0
             for post in candidates:
-                if processed_in_sub >= cfg.collection.limit_per_subreddit:
-                    break
                 try:
+                    storage.save_post(post, status="COLLECTED")
                     comments = fetch_and_select_comments(reddit, post.id, cfg.comments)
                     post.num_comments = len(comments)
                     if len(comments) < cfg.collection.min_comments:
                         log.info("Skipping post %s (only %d/%d qualifying comments)", post.id, len(comments), cfg.collection.min_comments)
+                        storage.mark_status(post.id, "SKIPPED")
                         continue
 
-                    processed_in_sub += 1
-                    storage.save_post(post, status="COLLECTED")
                     summary = summarizer.summarize(post, comments)
 
                     if summary.relevance_score < cfg.llm.min_relevance_score:
