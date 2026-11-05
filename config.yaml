@@ -1,7 +1,6 @@
 subreddits:
   - robotics
   - AskRobotics
-  - ComputerEngineering
 
 collection:
   limit_per_subreddit: 5
