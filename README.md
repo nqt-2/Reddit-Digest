@@ -39,7 +39,8 @@ LLM Summarizer (Gemini 2.5 Flash + Pydantic Structured Output)
    ```powershell
    Copy-Item .env.example .env
    ```
-
+4. Chay chuong trinh:
+   `python -m src.main --once`
 ## Tài liệu liên quan
 
 - Lộ trình học tập & phát triển: [reddit_ai_digest_python_roadmap.md](file:///C:/Users/LENOVO/Reddit%20Digest/reddit_ai_digest_python_roadmap.md)
