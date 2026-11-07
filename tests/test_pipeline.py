@@ -2,10 +2,11 @@ from pathlib import Path
 import pytest
 from src.collector import extract_md_text, merge_and_score_posts
 from src.config import CollectionConfig, CredentialsConfig, load_config
-from src.digest import render_telegram_html, save_markdown_digest
+from src.digest import render_quick_list_html, render_telegram_html, save_markdown_digest
 from src.filters import filter_posts
 from src.schemas import DigestSummary, Post
 from src.storage import Storage
+from src.telegram import BotCommand, parse_bot_command
 
 NOW_TS = 1700000000.0
 
@@ -138,3 +139,65 @@ def test_markdown_and_telegram_rendering(tmp_path: Path):
     assert "<b>🛠️ Bối cảnh &amp; Vấn đề:</b>" in tg_html
     assert "• Chưa có bình luận" in tg_html
     assert "⚠️ Lưu ý" not in tg_html
+
+
+def test_parse_bot_command():
+    assert parse_bot_command("hello world") is None
+    assert parse_bot_command("/help") == BotCommand(kind="help")
+    assert parse_bot_command("/start@MyDigestBot") == BotCommand(kind="help")
+
+    assert parse_bot_command("/news") == BotCommand(kind="news", quick=False, limit=None)
+    assert parse_bot_command("/news 3") == BotCommand(kind="news", quick=False, limit=3)
+    assert parse_bot_command("/news quick 8") == BotCommand(kind="news", quick=True, limit=8)
+    assert parse_bot_command("/quick") == BotCommand(kind="news", quick=True, limit=None)
+
+    assert parse_bot_command("/robotics") == BotCommand(kind="subreddit", subreddit="robotics", quick=False, limit=None)
+    assert parse_bot_command("/AskRobotics@MyBot 4") == BotCommand(kind="subreddit", subreddit="AskRobotics", quick=False, limit=4)
+    assert parse_bot_command("/python quick 10") == BotCommand(kind="subreddit", subreddit="python", quick=True, limit=10)
+    assert parse_bot_command("/quick_cpp 6") == BotCommand(kind="subreddit", subreddit="cpp", quick=True, limit=6)
+    assert parse_bot_command("/quick embedded 5") == BotCommand(kind="subreddit", subreddit="embedded", quick=True, limit=5)
+
+    assert parse_bot_command("/sum 2") == BotCommand(kind="sum", indices=[2])
+    assert parse_bot_command("/sum 1 3 1") == BotCommand(kind="sum", indices=[1, 3])
+    assert parse_bot_command("/sum").kind == "invalid"
+    assert parse_bot_command("/sum 0").kind == "invalid"
+    assert parse_bot_command("/sum abc").kind == "invalid"
+
+    assert parse_bot_command("/news 999").kind == "invalid"
+    assert parse_bot_command("/invalid-sub-name!").kind == "invalid"
+
+
+def test_filter_posts_skip_processed_and_custom_limit(tmp_path: Path):
+    storage = Storage(tmp_path / "test.db")
+    cfg = CollectionConfig(limit_per_subreddit=5, max_age_days=7, min_selftext_chars=80, min_comments=2)
+
+    p1 = make_post(id="p1", hot_score=90.0)
+    p2 = make_post(id="p2", hot_score=80.0)
+    summary = DigestSummary(
+        relevance_score=2,
+        post_type="discussion",
+        summary="Test summary",
+        comment_insights=[],
+        study_topics=[],
+        notes=[],
+    )
+    storage.save_post(p1, status="DELIVERED", summary=summary)
+
+    # Default mode skips already processed p1
+    assert [p.id for p in filter_posts([p1, p2], cfg, storage, now_ts=NOW_TS)] == ["p2"]
+    # Custom subreddit mode includes p1 and respects custom limit=1
+    assert [p.id for p in filter_posts([p1, p2], cfg, storage, now_ts=NOW_TS, skip_processed=False, limit=1)] == ["p1"]
+    assert storage.get_summary("p1") == summary
+    assert storage.get_summary("p2") is None
+    storage.close()
+
+
+def test_render_quick_list_html():
+    p1 = make_post(id="p1", hot_score=88.4)
+    p1.title = "ROS2 & <Nav2> Guide"
+    html_out = render_quick_list_html("robotics", [p1], max_age_days=7)
+    assert "<b>🔥 Top bài viết r/robotics (7 ngày qua):</b>" in html_out
+    assert '1. <a href="https://www.reddit.com/r/Embedded/comments/p1">ROS2 &amp; &lt;Nav2&gt; Guide</a> (🔥 88)' in html_out
+
+    empty_out = render_quick_list_html("robotics", [], max_age_days=7)
+    assert "Không tìm thấy bài viết phù hợp." in empty_out

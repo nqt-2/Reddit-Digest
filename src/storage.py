@@ -30,6 +30,14 @@ class Storage:
         ).fetchone()
         return row is not None and row["status"] in ("SUMMARIZED", "DELIVERED", "SKIPPED")
 
+    def get_summary(self, post_id: str) -> DigestSummary | None:
+        row = self.conn.execute(
+            "SELECT summary_json FROM posts WHERE id = ?", (post_id,)
+        ).fetchone()
+        if row and row["summary_json"]:
+            return DigestSummary.model_validate_json(row["summary_json"])
+        return None
+
     def save_post(self, post: Post, status: str = "COLLECTED", summary: DigestSummary | None = None) -> None:
         self.conn.execute(
             """

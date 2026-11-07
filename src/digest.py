@@ -57,3 +57,19 @@ def render_telegram_html(post: Post, s: DigestSummary) -> str:
         notes_html = "\n".join(f"• {esc(i)}" for i in s.notes[:3])
         parts.append(f"<b>⚠️ Lưu ý:</b>\n{notes_html}")
     return "\n\n".join(parts)
+
+
+def render_quick_list_html(
+    subreddit: str,
+    posts: list[Post],
+    max_age_days: int = 7,
+    start_index: int = 1,
+) -> str:
+    esc = html.escape
+    header = f"<b>🔥 Top bài viết r/{esc(subreddit)} ({max_age_days} ngày qua):</b>"
+    if not posts:
+        return f"{header}\n\nKhông tìm thấy bài viết phù hợp."
+    lines = [header, ""]
+    for idx, p in enumerate(posts, start=start_index):
+        lines.append(f'{idx}. <a href="{esc(p.permalink)}">{esc(p.title)}</a> (🔥 {p.hot_score:.0f})')
+    return "\n".join(lines)

@@ -39,8 +39,19 @@ LLM Summarizer (Gemini 2.5 Flash + Pydantic Structured Output)
    ```powershell
    Copy-Item .env.example .env
    ```
-4. Chay chuong trinh:
-   `python -m src.main --once`
+4. Chạy chương trình:
+   - Chạy một lần rồi thoát: `python -m src.main --once`
+   - Chạy lắng nghe lệnh Telegram Bot: `python -m src.main --bot`
+   - Chạy định kỳ theo lịch kèm lắng nghe lệnh Telegram Bot: `python -m src.main --schedule`
+
+## Lệnh Telegram Bot
+
+- `/news [N]` — Tóm tắt AI các bài viết mới & hot nhất (7 ngày qua) từ các subreddit mặc định trong `config.yaml`.
+- `/news quick [N]` hoặc `/quick` — Xem nhanh danh sách tiêu đề + link từ các subreddit mặc định.
+- `/<subreddit> [N]` — Tóm tắt AI top bài hot nhất (7 ngày qua) của `r/<subreddit>` bất kỳ (ví dụ: `/python`, `/robotics 3`).
+- `/<subreddit> quick [N]` hoặc `/quick_<subreddit> [N]` — Xem nhanh danh sách bài hot của `r/<subreddit>` (ví dụ: `/python quick 10`).
+- `/sum <số> [số...]` — Tóm tắt AI bài viết cụ thể theo số thứ tự từ danh sách `quick` gần nhất (ví dụ: `/sum 2` hoặc `/sum 1 3`).
+- `/help` — Hiển thị hướng dẫn sử dụng.
 ## Tài liệu liên quan
 
 - Lộ trình học tập & phát triển: [reddit_ai_digest_python_roadmap.md](file:///C:/Users/LENOVO/Reddit%20Digest/reddit_ai_digest_python_roadmap.md)
