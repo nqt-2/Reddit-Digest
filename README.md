@@ -24,7 +24,7 @@ LLM Summarizer (Gemini 2.5 Flash + Pydantic Structured Output)
         +------> Telegram Bot (HTML mode)
 ```
 
-## Cài đặt môi trường (Milestone 0)
+## Cài đặt môi trường
 
 1. Tạo và kích hoạt virtual environment:
    ```powershell
@@ -52,6 +52,5 @@ LLM Summarizer (Gemini 2.5 Flash + Pydantic Structured Output)
 - `/<subreddit> quick [N]` hoặc `/quick_<subreddit> [N]` — Xem nhanh danh sách bài hot của `r/<subreddit>` (ví dụ: `/python quick 10`).
 - `/sum <số> [số...]` — Tóm tắt AI bài viết cụ thể theo số thứ tự từ danh sách `quick` gần nhất (ví dụ: `/sum 2` hoặc `/sum 1 3`).
 - `/help` — Hiển thị hướng dẫn sử dụng.
-## Tài liệu liên quan
 
-- Lộ trình học tập & phát triển: [reddit_ai_digest_python_roadmap.md](file:///C:/Users/LENOVO/Reddit%20Digest/reddit_ai_digest_python_roadmap.md)
+
