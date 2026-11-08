@@ -28,7 +28,7 @@ class Storage:
         row = self.conn.execute(
             "SELECT status FROM posts WHERE id = ?", (post_id,)
         ).fetchone()
-        return row is not None and row["status"] in ("SUMMARIZED", "DELIVERED", "SKIPPED")
+        return row is not None and row["status"] in ("DELIVERED", "SKIPPED")
 
     def get_summary(self, post_id: str) -> DigestSummary | None:
         row = self.conn.execute(

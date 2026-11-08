@@ -71,8 +71,12 @@ def test_filter_and_sqlite_dedup(tmp_path: Path):
     res = filter_posts([good, short_self, quiet_post, old_post, sticky], cfg, storage, now_ts=NOW_TS)
     assert [p.id for p in res] == ["good"]
 
-    # Once marked SUMMARIZED, it must be skipped on next run
+    # COLLECTED and SUMMARIZED (undelivered) remain eligible for retry; DELIVERED and SKIPPED are skipped
+    storage.save_post(good, status="COLLECTED")
+    assert [p.id for p in filter_posts([good], cfg, storage, now_ts=NOW_TS)] == ["good"]
     storage.save_post(good, status="SUMMARIZED")
+    assert [p.id for p in filter_posts([good], cfg, storage, now_ts=NOW_TS)] == ["good"]
+    storage.save_post(good, status="DELIVERED")
     assert filter_posts([good], cfg, storage, now_ts=NOW_TS) == []
     storage.close()
 
@@ -201,3 +205,61 @@ def test_render_quick_list_html():
 
     empty_out = render_quick_list_html("robotics", [], max_age_days=7)
     assert "Không tìm thấy bài viết phù hợp." in empty_out
+
+
+def test_pipeline_backfills_limit_and_retries_summarized(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    import src.main as main_mod
+    from src.schemas import Comment
+
+    p_no_comments = make_post(id="p_no_com", hot_score=95.0, created_utc=0.0)
+    p_cached = make_post(id="p_cached", hot_score=85.0, created_utc=0.0)
+    p_fresh = make_post(id="p_fresh", hot_score=75.0, created_utc=0.0)
+
+    cached_sum = DigestSummary(
+        relevance_score=4,
+        post_type="problem",
+        summary="Cached summary",
+        comment_insights=["Fix A"],
+        study_topics=[],
+        notes=[],
+    )
+    db_path = tmp_path / "test.db"
+    st = Storage(db_path)
+    st.save_post(p_cached, status="SUMMARIZED", summary=cached_sum)
+    st.close()
+
+    for k in ("GEMINI_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+        monkeypatch.setenv(k, "test_secret_val")
+    cfg = load_config(env_path=tmp_path / "no.env")
+    cfg.storage.db_path = db_path
+    cfg.storage.digest_dir = tmp_path / "digests"
+    cfg.collection.limit_per_subreddit = 2
+
+    summarize_calls = []
+    sent_msgs = []
+
+    monkeypatch.setattr(main_mod, "load_config", lambda: cfg)
+    monkeypatch.setattr(main_mod.Summarizer, "__init__", lambda self, c: None)
+    monkeypatch.setattr(main_mod.RedditClient, "fetch_hot_posts", lambda self, sub, c: [p_no_comments, p_cached, p_fresh])
+    monkeypatch.setattr(
+        main_mod,
+        "fetch_and_select_comments",
+        lambda client, pid, c: [] if pid == "p_no_com" else [Comment(id="c1", author="u", score=1, body="x" * 30)] * 2,
+    )
+    monkeypatch.setattr(
+        main_mod.Summarizer,
+        "summarize",
+        lambda self, post, comments: (summarize_calls.append(post.id) or cached_sum),
+    )
+    monkeypatch.setattr(main_mod, "send_telegram_message", lambda creds, html_text: sent_msgs.append(html_text))
+
+    count, failed = main_mod.run_pipeline(subreddits=["robotics"], limit=2)
+    assert count == 2
+    assert not failed
+    assert summarize_calls == ["p_fresh"]  # p_cached reused SQLite summary without calling Gemini
+
+    st = Storage(db_path)
+    assert not st.is_processed("p_no_com")  # remains COLLECTED, not SKIPPED
+    assert st.is_processed("p_cached")
+    assert st.is_processed("p_fresh")
+    st.close()

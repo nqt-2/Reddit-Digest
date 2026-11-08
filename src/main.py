@@ -43,6 +43,7 @@ def run_pipeline(
     reddit = RedditClient(cfg.credentials)
     summarizer = Summarizer(cfg)
     delivered_items = []
+    sent_items = []
     failed_subs: list[str] = []
 
     try:
@@ -55,58 +56,61 @@ def run_pipeline(
                 failed_subs.append(sub)
                 continue
 
+            max_per_sub = limit or collection_cfg.limit_per_subreddit
             candidates = filter_posts(
                 raw_posts,
                 collection_cfg,
                 storage,
                 skip_processed=not custom_sub_mode,
-                limit=limit,
+                limit=len(raw_posts),
             )
-            log.info("r/%s: %d unique hot posts in pool, %d top candidates selected", sub, len(raw_posts), len(candidates))
+            log.info("r/%s: %d unique hot posts in pool, %d candidates after filter", sub, len(raw_posts), len(candidates))
 
+            sub_items = []
             for post in candidates:
+                if len(sub_items) >= max_per_sub:
+                    break
                 try:
-                    cached_summary = storage.get_summary(post.id) if custom_sub_mode else None
-                    if cached_summary is not None:
-                        summary = cached_summary
-                    else:
+                    summary = storage.get_summary(post.id)
+                    if summary is None:
                         storage.save_post(post, status="COLLECTED")
                         comments = fetch_and_select_comments(reddit, post.id, cfg.comments)
                         post.num_comments = len(comments)
                         if len(comments) < cfg.collection.min_comments:
                             log.info("Skipping post %s (only %d/%d qualifying comments)", post.id, len(comments), cfg.collection.min_comments)
-                            storage.mark_status(post.id, "SKIPPED")
                             continue
 
                         summary = summarizer.summarize(post, comments)
-
-                        if not custom_sub_mode and summary.relevance_score < cfg.llm.min_relevance_score:
-                            log.info("Skipping %s (relevance=%d)", post.id, summary.relevance_score)
-                            storage.save_post(post, status="SKIPPED", summary=summary)
-                            continue
-
                         storage.save_post(post, status="SUMMARIZED", summary=summary)
 
-                    delivered_items.append((post, summary))
+                    if not custom_sub_mode and summary.relevance_score < cfg.llm.min_relevance_score:
+                        log.info("Skipping %s (relevance=%d)", post.id, summary.relevance_score)
+                        storage.save_post(post, status="SKIPPED", summary=summary)
+                        continue
+
+                    sub_items.append((post, summary))
                 except Exception as exc:
                     log.error("Error processing post %s: %s", post.id, exc)
 
-        if delivered_items:
-            if not custom_sub_mode:
-                md_path = save_markdown_digest(delivered_items, cfg.storage.digest_dir)
-                log.info("Saved %d items to %s", len(delivered_items), md_path)
+            delivered_items.extend(sub_items)
 
-            for post, summary in delivered_items:
-                try:
-                    send_telegram_message(cfg.credentials, render_telegram_html(post, summary))
-                    storage.mark_status(post.id, "DELIVERED")
-                except Exception as exc:
-                    log.error("Telegram delivery failed for %s: %s", post.id, exc)
+        sent_items = []
+        for post, summary in delivered_items:
+            try:
+                send_telegram_message(cfg.credentials, render_telegram_html(post, summary))
+                storage.mark_status(post.id, "DELIVERED")
+                sent_items.append((post, summary))
+            except Exception as exc:
+                log.error("Telegram delivery failed for %s: %s", post.id, exc)
+
+        if sent_items and not custom_sub_mode:
+            md_path = save_markdown_digest(sent_items, cfg.storage.digest_dir)
+            log.info("Saved %d items to %s", len(sent_items), md_path)
     finally:
         reddit.close()
         storage.close()
 
-    return len(delivered_items), failed_subs
+    return len(sent_items), failed_subs
 
 
 def run_quick_list(
