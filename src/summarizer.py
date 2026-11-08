@@ -19,9 +19,7 @@ def format_untrusted_payload(post: Post, comments: list[Comment]) -> str:
     if not comments:
         lines.append("(No qualifying comments)")
     for c in comments:
-        lines.append(f"- [score={c.score}] u/{c.author}: {c.body}")
-        for r in c.replies:
-            lines.append(f"  - [reply score={r.score}] u/{r.author}: {r.body}")
+        lines.append(f"- u/{c.author}: {c.body}")
     lines.append("</untrusted_reddit_data>")
     return "\n".join(lines)
 

@@ -11,8 +11,7 @@ collection:
   min_comments: 2
 
 comments:
-  max_top_level: 8
-  max_replies_per_comment: 2
+  max_comments: 24
   min_comment_length: 20
   max_total_chars: 6000
 

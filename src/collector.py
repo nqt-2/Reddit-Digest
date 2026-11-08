@@ -14,7 +14,7 @@ log = logging.getLogger("digest")
 
 def extract_md_text(raw_html: str) -> str:
     """Extract plain text from Reddit's <div class="md"> HTML block."""
-    m = re.search(r'<div class="md">(.*?)</div>\s*(?:<!-- SC_ON -->|$)', raw_html, re.DOTALL)
+    m = re.search(r'<div class="md">(.*?)</div>', raw_html, re.DOTALL)
     chunk = m.group(1) if m else raw_html
     text = re.sub(r"<br\s*/?>|</p>|</li>", "\n", chunk)
     text = re.sub(r"<[^>]+>", "", text)
@@ -38,7 +38,7 @@ def _parse_rss_entries(root: ET.Element, subreddit: str) -> list[Post]:
 
         ext_match = re.search(r'<a href="([^"]+)">\[link\]</a>', content_html)
         ext_url = html.unescape(ext_match.group(1)) if ext_match else permalink
-        is_self = (ext_url == permalink) or bool(selftext)
+        is_self = ext_url == permalink
 
         published_str = (
             entry.findtext("a:published", default="", namespaces=ATOM_NS)
@@ -59,7 +59,6 @@ def _parse_rss_entries(root: ET.Element, subreddit: str) -> list[Post]:
                 hot_score=0.0,
                 num_comments=-1,
                 is_self=is_self,
-                stickied=False,
             )
         )
     return posts
@@ -111,13 +110,6 @@ class RedditClient:
             resp.raise_for_status()
             return ET.fromstring(resp.text)
         raise RuntimeError(f"Rate limited on {url}")
-
-    def fetch_new_posts(self, subreddit: str, limit: int) -> list[Post]:
-        root = self.get_rss(
-            f"https://www.reddit.com/r/{subreddit}/new/.rss",
-            params={"limit": limit},
-        )
-        return _parse_rss_entries(root, subreddit)
 
     def fetch_hot_posts(self, subreddit: str, cfg: CollectionConfig) -> list[Post]:
         top_posts: list[Post] = []

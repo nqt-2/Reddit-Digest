@@ -19,8 +19,7 @@ class CollectionConfig(BaseModel):
 
 
 class CommentsConfig(BaseModel):
-    max_top_level: int = Field(gt=0)
-    max_replies_per_comment: int = Field(ge=0)
+    max_comments: int = Field(default=24, gt=0)
     min_comment_length: int = Field(ge=0)
     max_total_chars: int = Field(gt=0)
 

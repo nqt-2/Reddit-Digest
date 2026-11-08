@@ -19,7 +19,7 @@ def filter_posts(
     accepted = []
     seen = set()
     for p in posts:
-        if p.id in seen or p.stickied:
+        if p.id in seen:
             continue
         if skip_processed and storage is not None and storage.is_processed(p.id):
             continue

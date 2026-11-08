@@ -2,13 +2,12 @@ import argparse
 import html
 import logging
 import time
-from apscheduler.schedulers.background import BackgroundScheduler
 from src.collector import RedditClient
 from src.comments import fetch_and_select_comments
-from src.config import load_config
+from src.config import AppConfig, CollectionConfig, load_config
 from src.digest import render_quick_list_html, render_telegram_html, save_markdown_digest
 from src.filters import filter_posts
-from src.schemas import Post
+from src.schemas import DigestSummary, Post
 from src.storage import Storage
 from src.summarizer import Summarizer
 from src.telegram import (
@@ -27,18 +26,45 @@ log = logging.getLogger("digest")
 LAST_QUICK_POSTS: list[Post] = []
 
 
+def _collection_cfg(cfg: AppConfig, limit: int | None) -> CollectionConfig:
+    if not limit:
+        return cfg.collection
+    return cfg.collection.model_copy(update={"fetch_pool_size": max(cfg.collection.fetch_pool_size, limit)})
+
+
+def _get_or_create_summary(
+    post: Post,
+    cfg: AppConfig,
+    storage: Storage,
+    reddit: RedditClient,
+    summarizer: Summarizer,
+    require_min_comments: bool = True,
+) -> DigestSummary | None:
+    summary = storage.get_summary(post.id)
+    if summary is not None:
+        return summary
+
+    storage.save_post(post, status="COLLECTED")
+    comments = fetch_and_select_comments(reddit, post.id, cfg.comments)
+    post.num_comments = len(comments)
+    if require_min_comments and len(comments) < cfg.collection.min_comments:
+        log.info("Skipping post %s (only %d/%d qualifying comments)", post.id, len(comments), cfg.collection.min_comments)
+        return None
+
+    summary = summarizer.summarize(post, comments)
+    storage.save_post(post, status="SUMMARIZED", summary=summary)
+    return summary
+
+
 def run_pipeline(
     subreddits: list[str] | None = None,
     limit: int | None = None,
     custom_sub_mode: bool = False,
+    cfg: AppConfig | None = None,
 ) -> tuple[int, list[str]]:
-    cfg = load_config()
+    cfg = cfg or load_config()
     target_subs = subreddits if subreddits is not None else cfg.subreddits
-    collection_cfg = (
-        cfg.collection.model_copy(update={"fetch_pool_size": max(cfg.collection.fetch_pool_size, limit)})
-        if limit
-        else cfg.collection
-    )
+    collection_cfg = _collection_cfg(cfg, limit)
     storage = Storage(cfg.storage.db_path)
     reddit = RedditClient(cfg.credentials)
     summarizer = Summarizer(cfg)
@@ -71,17 +97,9 @@ def run_pipeline(
                 if len(sub_items) >= max_per_sub:
                     break
                 try:
-                    summary = storage.get_summary(post.id)
+                    summary = _get_or_create_summary(post, cfg, storage, reddit, summarizer, require_min_comments=True)
                     if summary is None:
-                        storage.save_post(post, status="COLLECTED")
-                        comments = fetch_and_select_comments(reddit, post.id, cfg.comments)
-                        post.num_comments = len(comments)
-                        if len(comments) < cfg.collection.min_comments:
-                            log.info("Skipping post %s (only %d/%d qualifying comments)", post.id, len(comments), cfg.collection.min_comments)
-                            continue
-
-                        summary = summarizer.summarize(post, comments)
-                        storage.save_post(post, status="SUMMARIZED", summary=summary)
+                        continue
 
                     if not custom_sub_mode and summary.relevance_score < cfg.llm.min_relevance_score:
                         log.info("Skipping %s (relevance=%d)", post.id, summary.relevance_score)
@@ -116,14 +134,11 @@ def run_pipeline(
 def run_quick_list(
     subreddits: list[str] | None = None,
     limit: int | None = None,
+    cfg: AppConfig | None = None,
 ) -> tuple[list[Post], list[str]]:
-    cfg = load_config()
+    cfg = cfg or load_config()
     target_subs = subreddits if subreddits is not None else cfg.subreddits
-    collection_cfg = (
-        cfg.collection.model_copy(update={"fetch_pool_size": max(cfg.collection.fetch_pool_size, limit)})
-        if limit
-        else cfg.collection
-    )
+    collection_cfg = _collection_cfg(cfg, limit)
     reddit = RedditClient(cfg.credentials)
     listed_posts: list[Post] = []
     failed_subs: list[str] = []
@@ -155,8 +170,8 @@ def run_quick_list(
     return listed_posts, failed_subs
 
 
-def run_summarize_posts(posts: list[Post]) -> int:
-    cfg = load_config()
+def run_summarize_posts(posts: list[Post], cfg: AppConfig | None = None) -> int:
+    cfg = cfg or load_config()
     storage = Storage(cfg.storage.db_path)
     reddit = RedditClient(cfg.credentials)
     summarizer = Summarizer(cfg)
@@ -165,14 +180,9 @@ def run_summarize_posts(posts: list[Post]) -> int:
     try:
         for post in posts:
             try:
-                summary = storage.get_summary(post.id)
+                summary = _get_or_create_summary(post, cfg, storage, reddit, summarizer, require_min_comments=False)
                 if summary is None:
-                    storage.save_post(post, status="COLLECTED")
-                    comments = fetch_and_select_comments(reddit, post.id, cfg.comments)
-                    post.num_comments = len(comments)
-                    summary = summarizer.summarize(post, comments)
-                    storage.save_post(post, status="SUMMARIZED", summary=summary)
-
+                    continue
                 send_telegram_message(cfg.credentials, render_telegram_html(post, summary))
                 storage.mark_status(post.id, "DELIVERED")
                 delivered += 1
@@ -222,7 +232,7 @@ def handle_telegram_command(cmd: BotCommand) -> None:
         selected = [LAST_QUICK_POSTS[i - 1] for i in cmd.indices]
         nums_str = ", ".join(f"#{i}" for i in cmd.indices)
         send_telegram_message(creds, f"⏳ Đang tóm tắt AI bài viết {nums_str}...")
-        count = run_summarize_posts(selected)
+        count = run_summarize_posts(selected, cfg=cfg)
         if count == 0:
             send_telegram_message(creds, "❌ Không thể tóm tắt bài viết đã chọn.")
         return
@@ -231,12 +241,12 @@ def handle_telegram_command(cmd: BotCommand) -> None:
         subs_label = ", ".join(f"r/{html.escape(s)}" for s in cfg.subreddits)
         if cmd.quick:
             send_telegram_message(creds, f"⏳ Đang lấy danh sách nhanh từ {subs_label} (tối đa {effective_limit} bài/subreddit)...")
-            listed, failed = run_quick_list(subreddits=cfg.subreddits, limit=effective_limit)
+            listed, failed = run_quick_list(subreddits=cfg.subreddits, limit=effective_limit, cfg=cfg)
             if listed:
                 LAST_QUICK_POSTS = listed
         else:
             send_telegram_message(creds, f"⏳ Đang tìm và tóm tắt bài mới từ {subs_label} (tối đa {effective_limit} bài/subreddit)...")
-            count, failed = run_pipeline(subreddits=cfg.subreddits, limit=effective_limit, custom_sub_mode=False)
+            count, failed = run_pipeline(subreddits=cfg.subreddits, limit=effective_limit, custom_sub_mode=False, cfg=cfg)
             if count == 0 and len(failed) < len(cfg.subreddits):
                 send_telegram_message(creds, f"✅ Không có bài viết mới nào đạt tiêu chuẩn từ {subs_label}.")
         if failed:
@@ -249,22 +259,23 @@ def handle_telegram_command(cmd: BotCommand) -> None:
         sub_esc = html.escape(sub)
         if cmd.quick:
             send_telegram_message(creds, f"⏳ Đang lấy top {effective_limit} bài viết từ <b>r/{sub_esc}</b>...")
-            listed, failed = run_quick_list(subreddits=[sub], limit=effective_limit)
+            listed, failed = run_quick_list(subreddits=[sub], limit=effective_limit, cfg=cfg)
             if listed:
                 LAST_QUICK_POSTS = listed
         else:
             send_telegram_message(creds, f"⏳ Đang lấy và tóm tắt AI top {effective_limit} bài viết từ <b>r/{sub_esc}</b>...")
-            count, failed = run_pipeline(subreddits=[sub], limit=effective_limit, custom_sub_mode=True)
+            count, failed = run_pipeline(subreddits=[sub], limit=effective_limit, custom_sub_mode=True, cfg=cfg)
             if count == 0 and not failed:
                 send_telegram_message(creds, f"ℹ️ Không tìm thấy bài viết đủ điều kiện bình luận trong 7 ngày qua trên <b>r/{sub_esc}</b>.")
         if failed:
             send_telegram_message(creds, f"❌ Không thể truy cập <b>r/{sub_esc}</b> (subreddit không tồn tại, riêng tư hoặc lỗi mạng).")
 
 
-def run_bot_loop() -> None:
+def run_bot_loop(schedule_interval_hours: int | None = None) -> None:
     cfg = load_config()
     creds = cfg.credentials
     offset: int | None = None
+    last_run = time.monotonic()
 
     try:
         initial = fetch_telegram_updates(creds, offset=-1, timeout=0)
@@ -276,6 +287,11 @@ def run_bot_loop() -> None:
     log.info("Telegram bot listening for commands (/news, /<subreddit>, /help)...")
     while True:
         try:
+            if schedule_interval_hours and (time.monotonic() - last_run >= schedule_interval_hours * 3600):
+                log.info("Running scheduled pipeline pass...")
+                last_run = time.monotonic()
+                run_pipeline()
+
             updates = fetch_telegram_updates(creds, offset=offset, timeout=30)
             for upd in updates:
                 offset = upd["update_id"] + 1
@@ -311,15 +327,9 @@ def main() -> None:
 
     if args.schedule:
         cfg = load_config()
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(run_pipeline, "interval", hours=cfg.schedule.interval_hours)
-        scheduler.start()
         log.info("Scheduled pipeline every %s hours. Running initial pass now...", cfg.schedule.interval_hours)
-        try:
-            run_pipeline()
-            run_bot_loop()
-        finally:
-            scheduler.shutdown(wait=False)
+        run_pipeline()
+        run_bot_loop(schedule_interval_hours=cfg.schedule.interval_hours)
     elif args.bot:
         run_bot_loop()
     else:

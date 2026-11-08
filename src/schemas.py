@@ -5,9 +5,7 @@ from pydantic import BaseModel, Field
 class Comment(BaseModel):
     id: str
     author: str
-    score: int
     body: str
-    replies: list["Comment"] = []
 
 
 class Post(BaseModel):
@@ -22,7 +20,6 @@ class Post(BaseModel):
     hot_score: float = 0.0
     num_comments: int
     is_self: bool
-    stickied: bool = False
 
 
 class DigestSummary(BaseModel):

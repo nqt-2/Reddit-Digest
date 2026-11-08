@@ -33,15 +33,13 @@ def fetch_and_select_comments(client: RedditClient, post_id: str, cfg: CommentsC
             Comment(
                 id=raw_id.removeprefix("t1_"),
                 author=author,
-                score=1,
                 body=body,
             )
         )
 
     selected: list[Comment] = []
     used_chars = 0
-    max_items = cfg.max_top_level * (1 + cfg.max_replies_per_comment)
-    for c in comments[:max_items]:
+    for c in comments[: cfg.max_comments]:
         if used_chars + len(c.body) > cfg.max_total_chars:
             break
         used_chars += len(c.body)
