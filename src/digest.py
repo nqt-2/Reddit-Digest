@@ -11,8 +11,9 @@ def render_markdown_item(post: Post, s: DigestSummary) -> str:
     h_com = "Hướng giải quyết (Comments)" if is_prob else "Ý kiến nổi bật (Comments)"
 
     comments_md = "\n".join(f"- {c}" for c in s.comment_insights) if s.comment_insights else "- Chưa có bình luận"
+    safe_title = post.title.replace("[", r"\[").replace("]", r"\]")
     lines = [
-        f"## [{post.title}]({post.permalink}) (r/{post.subreddit} | {tag} | ⭐ {s.relevance_score}/5)",
+        f"## [{safe_title}]({post.permalink}) (r/{post.subreddit} | {tag} | ⭐ {s.relevance_score}/5)",
         f"**1.1 {h_sum}:** {s.summary}",
         f"**1.2 {h_com}:**\n{comments_md}",
     ]

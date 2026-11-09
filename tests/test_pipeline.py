@@ -124,7 +124,7 @@ def test_extract_md_text_strips_html():
 
 def test_markdown_and_telegram_rendering(tmp_path: Path):
     post = make_post(id="p1", selftext="content")
-    post.title = "C++ <template> & tricks"
+    post.title = "[Question] C++ <template> & tricks"
     summary = DigestSummary(
         relevance_score=4,
         post_type="problem",
@@ -136,6 +136,7 @@ def test_markdown_and_telegram_rendering(tmp_path: Path):
     md_file = save_markdown_digest([(post, summary)], tmp_path)
     assert md_file.exists()
     md_text = md_file.read_text(encoding="utf-8")
+    assert r"## [\[Question\] C++ <template> & tricks](https://www.reddit.com/r/Embedded/comments/p1)" in md_text
     assert "OP gặp lỗi tăng kích thước firmware" in md_text
     assert "Chưa có bình luận" in md_text
 

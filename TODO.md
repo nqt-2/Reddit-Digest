@@ -42,10 +42,10 @@
 
 ## Nice to Have
 
-- [ ] **10. New HTTP client created on every Telegram poll and message** (`src/telegram.py:L109, L137`)
+- [x] **10. New HTTP client created on every Telegram poll and message** (`src/telegram.py:L109, L137`)
   - **Issue:** `send_telegram_message` and `fetch_telegram_updates` open and close a new `httpx.Client` on every call, repeating TLS handshakes every 30s in `--bot` mode.
   - **Fix:** Reuse a single `httpx.Client` instance across Telegram API calls.
 
-- [ ] **11. Unescaped square brackets in post titles can break Markdown digest links** (`src/digest.py:L15`)
+- [x] **11. Unescaped square brackets in post titles can break Markdown digest links** (`src/digest.py:L15`)
   - **Issue:** `## [{post.title}]({post.permalink})` does not escape `[` or `]` in `post.title`.
   - **Fix:** Escape brackets in `post.title` when rendering Markdown links.
