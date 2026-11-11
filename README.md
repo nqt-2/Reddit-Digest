@@ -46,11 +46,9 @@ LLM Summarizer (Gemini 2.5 Flash + Pydantic Structured Output)
 
 ## Lệnh Telegram Bot
 
-- `/news [N]` — Tóm tắt AI các bài viết mới & hot nhất (7 ngày qua) từ các subreddit mặc định trong `config.yaml`.
-- `/news quick [N]` hoặc `/quick` — Xem nhanh danh sách tiêu đề + link từ các subreddit mặc định.
-- `/<subreddit> [N]` — Tóm tắt AI top bài hot nhất (7 ngày qua) của `r/<subreddit>` bất kỳ (ví dụ: `/python`, `/robotics 3`).
-- `/<subreddit> quick [N]` hoặc `/quick_<subreddit> [N]` — Xem nhanh danh sách bài hot của `r/<subreddit>` (ví dụ: `/python quick 10`).
-- `/sum <số> [số...]` — Tóm tắt AI bài viết cụ thể theo số thứ tự từ danh sách `quick` gần nhất (ví dụ: `/sum 2` hoặc `/sum 1 3`).
+- `/defaults [N]` — Xem danh sách tiêu đề + link các bài hot nhất (7 ngày qua) từ các subreddit mặc định trong `config.yaml`.
+- `/<subreddit> [N]` — Xem danh sách tiêu đề + link các bài hot nhất (7 ngày qua) của `r/<subreddit>` bất kỳ (ví dụ: `/python`, `/news 5`, `/robotics 10`).
+- `/sum <số> [số...]` — Tóm tắt AI bài viết cụ thể theo số thứ tự từ danh sách vừa lấy gần nhất (ví dụ: `/sum 2` hoặc `/sum 1 3`).
 - `/help` — Hiển thị hướng dẫn sử dụng.
 
 

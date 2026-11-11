@@ -11,9 +11,8 @@ _http_client = httpx.Client(timeout=15.0)
 
 
 class BotCommand(BaseModel):
-    kind: Literal["help", "news", "subreddit", "sum", "invalid"]
+    kind: Literal["help", "defaults", "subreddit", "sum", "invalid"]
     subreddit: str | None = None
-    quick: bool = False
     limit: int | None = None
     indices: list[int] = []
 
@@ -47,45 +46,23 @@ def parse_bot_command(text: str) -> BotCommand | None:
                 indices.append(val)
         return BotCommand(kind="sum", indices=indices)
 
-    quick = False
     limit: int | None = None
-    extra_tokens: list[str] = []
-
-    for arg in args:
-        low = arg.lower()
-        if low == "quick":
-            quick = True
-        elif arg.isdigit():
-            val = int(arg)
-            if 1 <= val <= 25:
-                limit = val
-            else:
-                return BotCommand(kind="invalid")
-        else:
-            extra_tokens.append(arg)
-
-    if cmd_lower == "news":
-        if extra_tokens:
+    if len(args) > 1:
+        return BotCommand(kind="invalid")
+    if len(args) == 1:
+        if not args[0].isdigit():
             return BotCommand(kind="invalid")
-        return BotCommand(kind="news", quick=quick, limit=limit)
+        val = int(args[0])
+        if 1 <= val <= 25:
+            limit = val
+        else:
+            return BotCommand(kind="invalid")
 
-    if cmd_lower == "quick":
-        if not extra_tokens:
-            return BotCommand(kind="news", quick=True, limit=limit)
-        if len(extra_tokens) == 1:
-            sub = extra_tokens[0].removeprefix("/r/").removeprefix("r/").strip("/")
-            if SUBREDDIT_RE.match(sub):
-                return BotCommand(kind="subreddit", subreddit=sub, quick=True, limit=limit)
-        return BotCommand(kind="invalid")
+    if cmd_lower == "defaults":
+        return BotCommand(kind="defaults", limit=limit)
 
-    if cmd_lower.startswith("quick_"):
-        sub = cmd_body[6:]
-        if not extra_tokens and SUBREDDIT_RE.match(sub):
-            return BotCommand(kind="subreddit", subreddit=sub, quick=True, limit=limit)
-        return BotCommand(kind="invalid")
-
-    if not extra_tokens and SUBREDDIT_RE.match(cmd_body):
-        return BotCommand(kind="subreddit", subreddit=cmd_body, quick=quick, limit=limit)
+    if SUBREDDIT_RE.match(cmd_body):
+        return BotCommand(kind="subreddit", subreddit=cmd_body, limit=limit)
 
     return BotCommand(kind="invalid")
 
@@ -94,11 +71,9 @@ def render_help_html(default_subs: list[str], default_limit: int) -> str:
     subs_str = ", ".join(f"r/{html.escape(s)}" for s in default_subs)
     return (
         "<b>🤖 Hướng dẫn sử dụng Reddit AI Digest Bot:</b>\n\n"
-        f"• <code>/news</code> — Tóm tắt AI bài mới &amp; hot nhất từ các subreddit mặc định ({subs_str})\n"
-        "• <code>/news quick [N]</code> — Xem nhanh danh sách tiêu đề + link từ các subreddit mặc định\n"
-        f"• <code>/&lt;subreddit&gt; [N]</code> — Tóm tắt AI top bài hot nhất (7 ngày qua) của <code>r/&lt;subreddit&gt;</code> (mặc định {default_limit} bài, VD: <code>/python</code> hoặc <code>/robotics 3</code>)\n"
-        "• <code>/&lt;subreddit&gt; quick [N]</code> hoặc <code>/quick_&lt;subreddit&gt;</code> — Xem nhanh danh sách bài hot của subreddit (VD: <code>/python quick 10</code>)\n"
-        "• <code>/sum &lt;số&gt; [số...]</code> — Tóm tắt AI bài viết cụ thể từ danh sách <code>quick</code> gần nhất (VD: <code>/sum 2</code> hoặc <code>/sum 1 3</code>)\n"
+        f"• <code>/defaults [N]</code> — Xem danh sách bài hot từ các subreddit mặc định ({subs_str}, mặc định {default_limit} bài/subreddit)\n"
+        f"• <code>/&lt;subreddit&gt; [N]</code> — Xem danh sách bài hot (7 ngày qua) của <code>r/&lt;subreddit&gt;</code> (mặc định {default_limit} bài, VD: <code>/python</code> hoặc <code>/robotics 10</code>)\n"
+        "• <code>/sum &lt;số&gt; [số...]</code> — Tóm tắt AI các bài viết được chọn từ danh sách gần nhất (VD: <code>/sum 2</code> hoặc <code>/sum 1 3</code>)\n"
         "• <code>/help</code> — Hiển thị hướng dẫn này"
     )
 

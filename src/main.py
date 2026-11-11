@@ -216,7 +216,7 @@ def handle_telegram_command(cmd: BotCommand) -> None:
         if not LAST_QUICK_POSTS:
             send_telegram_message(
                 creds,
-                "⚠️ Chưa có danh sách <code>quick</code> nào. Hãy chạy <code>/news quick</code> hoặc <code>/&lt;subreddit&gt; quick</code> trước.",
+                "⚠️ Chưa có danh sách bài viết nào. Hãy chạy <code>/defaults</code> hoặc <code>/&lt;subreddit&gt;</code> trước.",
             )
             return
 
@@ -237,18 +237,12 @@ def handle_telegram_command(cmd: BotCommand) -> None:
             send_telegram_message(creds, "❌ Không thể tóm tắt bài viết đã chọn.")
         return
 
-    if cmd.kind == "news":
+    if cmd.kind == "defaults":
         subs_label = ", ".join(f"r/{html.escape(s)}" for s in cfg.subreddits)
-        if cmd.quick:
-            send_telegram_message(creds, f"⏳ Đang lấy danh sách nhanh từ {subs_label} (tối đa {effective_limit} bài/subreddit)...")
-            listed, failed = run_quick_list(subreddits=cfg.subreddits, limit=effective_limit, cfg=cfg)
-            if listed:
-                LAST_QUICK_POSTS = listed
-        else:
-            send_telegram_message(creds, f"⏳ Đang tìm và tóm tắt bài mới từ {subs_label} (tối đa {effective_limit} bài/subreddit)...")
-            count, failed = run_pipeline(subreddits=cfg.subreddits, limit=effective_limit, custom_sub_mode=False, cfg=cfg)
-            if count == 0 and len(failed) < len(cfg.subreddits):
-                send_telegram_message(creds, f"✅ Không có bài viết mới nào đạt tiêu chuẩn từ {subs_label}.")
+        send_telegram_message(creds, f"⏳ Đang lấy danh sách bài viết từ {subs_label} (tối đa {effective_limit} bài/subreddit)...")
+        listed, failed = run_quick_list(subreddits=cfg.subreddits, limit=effective_limit, cfg=cfg)
+        if listed:
+            LAST_QUICK_POSTS = listed
         if failed:
             failed_str = ", ".join(f"r/{html.escape(s)}" for s in failed)
             send_telegram_message(creds, f"⚠️ Không thể tải dữ liệu từ: {failed_str}.")
@@ -257,16 +251,10 @@ def handle_telegram_command(cmd: BotCommand) -> None:
     if cmd.kind == "subreddit" and cmd.subreddit:
         sub = cmd.subreddit
         sub_esc = html.escape(sub)
-        if cmd.quick:
-            send_telegram_message(creds, f"⏳ Đang lấy top {effective_limit} bài viết từ <b>r/{sub_esc}</b>...")
-            listed, failed = run_quick_list(subreddits=[sub], limit=effective_limit, cfg=cfg)
-            if listed:
-                LAST_QUICK_POSTS = listed
-        else:
-            send_telegram_message(creds, f"⏳ Đang lấy và tóm tắt AI top {effective_limit} bài viết từ <b>r/{sub_esc}</b>...")
-            count, failed = run_pipeline(subreddits=[sub], limit=effective_limit, custom_sub_mode=True, cfg=cfg)
-            if count == 0 and not failed:
-                send_telegram_message(creds, f"ℹ️ Không tìm thấy bài viết đủ điều kiện bình luận trong 7 ngày qua trên <b>r/{sub_esc}</b>.")
+        send_telegram_message(creds, f"⏳ Đang lấy top {effective_limit} bài viết từ <b>r/{sub_esc}</b>...")
+        listed, failed = run_quick_list(subreddits=[sub], limit=effective_limit, cfg=cfg)
+        if listed:
+            LAST_QUICK_POSTS = listed
         if failed:
             send_telegram_message(creds, f"❌ Không thể truy cập <b>r/{sub_esc}</b> (subreddit không tồn tại, riêng tư hoặc lỗi mạng).")
 
@@ -284,7 +272,7 @@ def run_bot_loop(schedule_interval_hours: int | None = None) -> None:
     except Exception as exc:
         log.warning("Could not flush initial Telegram updates: %s", exc)
 
-    log.info("Telegram bot listening for commands (/news, /<subreddit>, /help)...")
+    log.info("Telegram bot listening for commands (/defaults, /<subreddit>, /sum, /help)...")
     while True:
         try:
             if schedule_interval_hours and (time.monotonic() - last_run >= schedule_interval_hours * 3600):
@@ -322,7 +310,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Reddit AI Digest")
     parser.add_argument("--once", action="store_true", help="Run pipeline once and exit (default)")
     parser.add_argument("--schedule", action="store_true", help="Run periodically on schedule and listen for Telegram commands")
-    parser.add_argument("--bot", action="store_true", help="Listen for Telegram bot commands (/news, /<subreddit>, /help)")
+    parser.add_argument("--bot", action="store_true", help="Listen for Telegram bot commands (/defaults, /<subreddit>, /sum, /help)")
     args = parser.parse_args()
 
     if args.schedule:

@@ -152,16 +152,13 @@ def test_parse_bot_command():
     assert parse_bot_command("/help") == BotCommand(kind="help")
     assert parse_bot_command("/start@MyDigestBot") == BotCommand(kind="help")
 
-    assert parse_bot_command("/news") == BotCommand(kind="news", quick=False, limit=None)
-    assert parse_bot_command("/news 3") == BotCommand(kind="news", quick=False, limit=3)
-    assert parse_bot_command("/news quick 8") == BotCommand(kind="news", quick=True, limit=8)
-    assert parse_bot_command("/quick") == BotCommand(kind="news", quick=True, limit=None)
+    assert parse_bot_command("/defaults") == BotCommand(kind="defaults", limit=None)
+    assert parse_bot_command("/defaults 3") == BotCommand(kind="defaults", limit=3)
 
-    assert parse_bot_command("/robotics") == BotCommand(kind="subreddit", subreddit="robotics", quick=False, limit=None)
-    assert parse_bot_command("/AskRobotics@MyBot 4") == BotCommand(kind="subreddit", subreddit="AskRobotics", quick=False, limit=4)
-    assert parse_bot_command("/python quick 10") == BotCommand(kind="subreddit", subreddit="python", quick=True, limit=10)
-    assert parse_bot_command("/quick_cpp 6") == BotCommand(kind="subreddit", subreddit="cpp", quick=True, limit=6)
-    assert parse_bot_command("/quick embedded 5") == BotCommand(kind="subreddit", subreddit="embedded", quick=True, limit=5)
+    assert parse_bot_command("/news") == BotCommand(kind="subreddit", subreddit="news", limit=None)
+    assert parse_bot_command("/news 5") == BotCommand(kind="subreddit", subreddit="news", limit=5)
+    assert parse_bot_command("/robotics") == BotCommand(kind="subreddit", subreddit="robotics", limit=None)
+    assert parse_bot_command("/AskRobotics@MyBot 4") == BotCommand(kind="subreddit", subreddit="AskRobotics", limit=4)
 
     assert parse_bot_command("/sum 2") == BotCommand(kind="sum", indices=[2])
     assert parse_bot_command("/sum 1 3 1") == BotCommand(kind="sum", indices=[1, 3])
@@ -169,7 +166,9 @@ def test_parse_bot_command():
     assert parse_bot_command("/sum 0").kind == "invalid"
     assert parse_bot_command("/sum abc").kind == "invalid"
 
-    assert parse_bot_command("/news 999").kind == "invalid"
+    assert parse_bot_command("/defaults quick").kind == "invalid"
+    assert parse_bot_command("/python quick 10").kind == "invalid"
+    assert parse_bot_command("/defaults 999").kind == "invalid"
     assert parse_bot_command("/invalid-sub-name!").kind == "invalid"
 
 
