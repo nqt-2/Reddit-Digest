@@ -30,6 +30,12 @@ class Storage:
         ).fetchone()
         return row is not None and row["status"] in ("DELIVERED", "SKIPPED")
 
+    def is_delivered(self, post_id: str) -> bool:
+        row = self.conn.execute(
+            "SELECT status FROM posts WHERE id = ?", (post_id,)
+        ).fetchone()
+        return row is not None and row["status"] == "DELIVERED"
+
     def get_summary(self, post_id: str) -> DigestSummary | None:
         row = self.conn.execute(
             "SELECT summary_json FROM posts WHERE id = ?", (post_id,)

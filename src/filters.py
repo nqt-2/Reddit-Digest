@@ -10,6 +10,7 @@ def filter_posts(
     storage: Storage | None = None,
     now_ts: float | None = None,
     skip_processed: bool = True,
+    skip_delivered_only: bool = False,
     limit: int | None = None,
 ) -> list[Post]:
     now = now_ts if now_ts is not None else time.time()
@@ -21,8 +22,11 @@ def filter_posts(
     for p in posts:
         if p.id in seen:
             continue
-        if skip_processed and storage is not None and storage.is_processed(p.id):
-            continue
+        if storage is not None:
+            if skip_delivered_only and storage.is_delivered(p.id):
+                continue
+            if skip_processed and storage.is_processed(p.id):
+                continue
         seen.add(p.id)
         if p.created_utc > 0 and p.created_utc < cutoff_utc:
             continue

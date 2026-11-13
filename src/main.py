@@ -139,6 +139,7 @@ def run_quick_list(
     cfg = cfg or load_config()
     target_subs = subreddits if subreddits is not None else cfg.subreddits
     collection_cfg = _collection_cfg(cfg, limit)
+    storage = Storage(cfg.storage.db_path)
     reddit = RedditClient(cfg.credentials)
     listed_posts: list[Post] = []
     failed_subs: list[str] = []
@@ -156,8 +157,9 @@ def run_quick_list(
             candidates = filter_posts(
                 raw_posts,
                 collection_cfg,
-                storage=None,
+                storage=storage,
                 skip_processed=False,
+                skip_delivered_only=True,
                 limit=limit,
             )
             start_idx = len(listed_posts) + 1
@@ -166,6 +168,7 @@ def run_quick_list(
             send_telegram_message(cfg.credentials, msg)
     finally:
         reddit.close()
+        storage.close()
 
     return listed_posts, failed_subs
 

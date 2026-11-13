@@ -178,6 +178,7 @@ def test_filter_posts_skip_processed_and_custom_limit(tmp_path: Path):
 
     p1 = make_post(id="p1", hot_score=90.0)
     p2 = make_post(id="p2", hot_score=80.0)
+    p3 = make_post(id="p3", hot_score=70.0)
     summary = DigestSummary(
         relevance_score=2,
         post_type="discussion",
@@ -187,13 +188,19 @@ def test_filter_posts_skip_processed_and_custom_limit(tmp_path: Path):
         notes=[],
     )
     storage.save_post(p1, status="DELIVERED", summary=summary)
+    storage.save_post(p2, status="SKIPPED", summary=summary)
 
-    # Default mode skips already processed p1
-    assert [p.id for p in filter_posts([p1, p2], cfg, storage, now_ts=NOW_TS)] == ["p2"]
-    # Custom subreddit mode includes p1 and respects custom limit=1
-    assert [p.id for p in filter_posts([p1, p2], cfg, storage, now_ts=NOW_TS, skip_processed=False, limit=1)] == ["p1"]
+    # Default mode skips both DELIVERED (p1) and SKIPPED (p2)
+    assert [p.id for p in filter_posts([p1, p2, p3], cfg, storage, now_ts=NOW_TS)] == ["p3"]
+    # Quick list mode (skip_delivered_only=True) skips DELIVERED (p1) and backfills with p2 and p3 to meet limit=2
+    assert [
+        p.id
+        for p in filter_posts(
+            [p1, p2, p3], cfg, storage, now_ts=NOW_TS, skip_processed=False, skip_delivered_only=True, limit=2
+        )
+    ] == ["p2", "p3"]
     assert storage.get_summary("p1") == summary
-    assert storage.get_summary("p2") is None
+    assert storage.get_summary("p3") is None
     storage.close()
 
 

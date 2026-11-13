@@ -4,7 +4,7 @@ subreddits:
 
 collection:
   limit_per_subreddit: 5
-  fetch_pool_size: 10
+  fetch_pool_size: 20
   time_filter: "week"
   max_age_days: 7
   min_selftext_chars: 80
